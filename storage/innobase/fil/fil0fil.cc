@@ -1402,7 +1402,7 @@ fil_write_flushed_lsn(
 		return DB_ERROR;
 	}
 
-	buf = static_cast<byte*>(aligned_malloc(srv_page_size, srv_page_size));
+	buf = static_cast<byte*>(my_malloc_aligned(srv_page_size, srv_page_size));
 
 	auto fio = fil_system.sys_space->io(IORequestRead, 0, srv_page_size,
 					    buf);
@@ -1425,7 +1425,7 @@ fil_write_flushed_lsn(
 		fil_system.sys_space->release();
 	}
 
-	aligned_free(buf);
+	my_free_aligned(buf);
 	return fio.err;
 }
 
@@ -2357,10 +2357,12 @@ err_exit:
 	flush would write to it. */
 
 	/* Align the memory for file i/o if we might have O_DIRECT set */
-	page = static_cast<byte*>(aligned_malloc(2 * srv_page_size,
-						 srv_page_size));
-
-	memset(page, '\0', srv_page_size);
+	page = static_cast<byte*>(my_calloc_aligned(2 * srv_page_size,
+						    srv_page_size));
+	if (!page) {
+		*err = DB_OUT_OF_MEMORY;
+		return NULL;
+	}
 
 	if (fil_space_t::full_crc32(flags)) {
 		flags |= FSP_FLAGS_FCRC32_PAGE_SSIZE();
@@ -2406,7 +2408,7 @@ err_exit:
 				     page, 0, srv_page_size);
 	}
 
-	aligned_free(page);
+	my_free_aligned(page);
 
 	if (*err != DB_SUCCESS) {
 		ib::error()
